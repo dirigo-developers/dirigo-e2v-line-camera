@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dirigo_e2v_line_scan_camera"
+version = "0.1.0"
+description = "Plugin to use E2V and Atmel line-scan cameras with Dirigo."
+authors = [
+    {name = "T. D. Weber", email = "tweber@mit.edu"}
+]
+license = {text = "MIT"}
+dependencies = []
+
+[project.entry-points."dirigo_line_scan_cameras"]
+uniiqa_plus_color = "dirigo_e2v_line_scan_camera:E2VUNiiQAPlusColor"
+aviiva_m2 = "dirigo_e2v_line_scan_camera:E2VAViiVAM2"
