@@ -2,7 +2,7 @@ import time
 from enum import IntEnum
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import Camera
+from dirigo.hw_interfaces.camera import LineScanCamera
 
 
 class AnalogGainOptions(IntEnum):
@@ -10,7 +10,7 @@ class AnalogGainOptions(IntEnum):
     X2 = 1
     X4 = 2
 
-class E2VUNiiQAPlusColor(Camera):
+class E2VUNiiQAPlusColor(LineScanCamera):
     def __init__(self, **kwargs):
         super().__init__(**kwargs) # This will load the frame grabber if available
 
@@ -59,7 +59,14 @@ class E2VUNiiQAPlusColor(Camera):
         return_code = self._frame_grabber.serial_read()
 
 
-class E2VAViiVAM2(Camera):
+
+
+class TriggerModes(IntEnum):
+    FREE_RUN            = 1
+    EXTERNAL_TRIGGER    = 2
+    # note 2 additional modes not implemented
+
+class E2VAViiVAM2(LineScanCamera):
     def __init__(self, **kwargs):
         super().__init__(**kwargs) # This will load the frame grabber if available
 
@@ -85,20 +92,48 @@ class E2VAViiVAM2(Camera):
         pass
 
     @property
-    def bits_per_pixel(self):
-        pass
-    
+    def bits_per_pixel(self) -> int:
+        """Returns the bits per pixel."""
+        data_dict = self._get_current_settings()
+        code = int(data_dict["S"])
+        if code == 0:
+            return 12
+        elif code == 1:
+            return 10
+        else:
+            return 8
+        
     @bits_per_pixel.setter
-    def bits_per_pixel(self, new_value):
-        pass
+    def bits_per_pixel(self, bits: int):
+        if bits == 12:
+            code = 0
+        elif bits == 10:
+            code = 1
+        elif bits == 8:
+            code = 2
+        else:
+            raise ValueError(f"Bits per pixel can be 8, 10, or 12. Got {bits}")
+        self._frame_grabber.serial_write(f"S={code}\r")
+        assert self._frame_grabber.serial_read() == ">OK\r"
 
     @property
     def trigger_mode(self):
-        pass
+        """
+        Returns description of the trigger mode 
+        """
+        data_dict = self._get_current_settings()
+        mode_number = int(data_dict["M"])
+        return TriggerModes(mode_number)
     
     @trigger_mode.setter
-    def trigger_mode(self, new_value):
-        pass
+    def trigger_mode(self, new_mode: TriggerModes):
+        if not isinstance(new_mode, TriggerModes):
+            raise ValueError(f"trigger_mode must be set with a TriggerMode "
+                             f"object, got {type(new_mode)}")
+        cmd = f"M={int(new_mode)}\r"
+        self._frame_grabber.serial_write(cmd)
+        response = self._frame_grabber.serial_read() 
+        assert response == ">OK\r", f"Unexpected serial response: {response}"
 
     def start(self):
         pass
