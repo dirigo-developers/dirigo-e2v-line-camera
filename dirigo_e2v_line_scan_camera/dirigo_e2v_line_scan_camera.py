@@ -141,8 +141,6 @@ class E2VAViiVAM2(LineScanCamera):
     def stop(self):
         pass
 
-
-
     def _get_current_settings(self) -> dict:
         """
         Helper function that polls camera's current settings.
