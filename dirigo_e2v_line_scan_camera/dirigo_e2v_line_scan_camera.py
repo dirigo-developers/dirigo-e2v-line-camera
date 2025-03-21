@@ -92,7 +92,7 @@ class E2VAViiVAM2(LineScanCamera):
         pass
 
     @property
-    def bits_per_pixel(self) -> int:
+    def bit_depth(self) -> int:
         """Returns the bits per pixel."""
         data_dict = self._get_current_settings()
         code = int(data_dict["S"])
@@ -102,9 +102,9 @@ class E2VAViiVAM2(LineScanCamera):
             return 10
         else:
             return 8
-        
-    @bits_per_pixel.setter
-    def bits_per_pixel(self, bits: int):
+   
+    @bit_depth.setter
+    def bit_depth(self, bits: int):
         if bits == 12:
             code = 0
         elif bits == 10:
