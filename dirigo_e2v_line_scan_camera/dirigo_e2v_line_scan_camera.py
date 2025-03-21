@@ -1,5 +1,5 @@
 import time
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 from dirigo import units
 from dirigo.hw_interfaces.camera import LineScanCamera
@@ -9,6 +9,13 @@ class AnalogGainOptions(IntEnum):
     X1 = 0
     X2 = 1
     X4 = 2
+
+
+class TriggerModes(Enum):
+    FREE_RUN            = 0
+    EXTERNAL_TRIGGER    = 1
+    # note 2 additional modes not implemented
+
 
 class E2VUNiiQAPlusColor(LineScanCamera):
     def __init__(self, **kwargs):
@@ -58,13 +65,47 @@ class E2VUNiiQAPlusColor(LineScanCamera):
         self._frame_grabber.serial_write(cmd)
         return_code = self._frame_grabber.serial_read()
 
+    @property
+    def bit_depth(self) -> int:
+        return 24 # RGB24
+    
+    @bit_depth.setter
+    def bit_depth(self, value: int):
+        raise NotImplementedError('Bit depth is not configurable on this camera.')
 
+    @property
+    def trigger_mode(self):
+        """
+        Returns description of the trigger mode 
+        """
+        cmd = "r sync\r"
+        self._frame_grabber.serial_write(cmd)
+        mode_number = self._frame_grabber.serial_read()
+        if mode_number == 0:
+            return TriggerModes.FREE_RUN
+        elif mode_number == 1:
+            return TriggerModes.EXTERNAL_TRIGGER
+        else:
+            raise RuntimeError("Unsupported trigger mode currently set.")
 
+    @trigger_mode.setter
+    def trigger_mode(self, new_mode: TriggerModes):
+        if new_mode == TriggerModes.FREE_RUN:
+            mode_number = 0
+        elif new_mode == TriggerModes.EXTERNAL_TRIGGER:
+            mode_number = 1
+        else:
+            raise ValueError("Specified trigger mode not supported.")
+        cmd = f"w sync {mode_number}\r"
+        self._frame_grabber.serial_write(cmd)
+        return_code = self._frame_grabber.serial_read()
 
-class TriggerModes(IntEnum):
-    FREE_RUN            = 1
-    EXTERNAL_TRIGGER    = 2
-    # note 2 additional modes not implemented
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
 
 class E2VAViiVAM2(LineScanCamera):
     def __init__(self, **kwargs):
@@ -123,14 +164,25 @@ class E2VAViiVAM2(LineScanCamera):
         """
         data_dict = self._get_current_settings()
         mode_number = int(data_dict["M"])
-        return TriggerModes(mode_number)
-    
+        if mode_number == 1:
+            return TriggerModes.FREE_RUN
+        elif mode_number == 2:
+            return TriggerModes.EXTERNAL_TRIGGER
+        else:
+            raise RuntimeError("Unsupported trigger mode currently set.")
+        
     @trigger_mode.setter
     def trigger_mode(self, new_mode: TriggerModes):
         if not isinstance(new_mode, TriggerModes):
             raise ValueError(f"trigger_mode must be set with a TriggerMode "
                              f"object, got {type(new_mode)}")
-        cmd = f"M={int(new_mode)}\r"
+        if new_mode == TriggerModes.FREE_RUN:
+            mode_number = 1
+        elif new_mode == TriggerModes.EXTERNAL_TRIGGER:
+            mode_number = 2
+        else:
+            raise ValueError("Specified trigger mode not supported.")
+        cmd = f"M={mode_number}\r"
         self._frame_grabber.serial_write(cmd)
         response = self._frame_grabber.serial_read() 
         assert response == ">OK\r", f"Unexpected serial response: {response}"
