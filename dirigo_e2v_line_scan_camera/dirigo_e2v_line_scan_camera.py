@@ -74,8 +74,8 @@ class E2VUNiiQAPlusColor(LineScanCamera):
         raise NotImplementedError('Bit depth is not configurable on this camera.')
     
     @property
-    def data_range(self) -> units.ValueRange:
-        return units.ValueRange(min=0, max=255) # 8-bits
+    def data_range(self) -> units.IntRange:
+        return units.IntRange(min=0, max=255) # 8-bits
 
     @property
     def trigger_mode(self):
@@ -162,8 +162,8 @@ class E2VAViiVAM2(LineScanCamera):
         assert self._frame_grabber.serial_read() == ">OK\r"
 
     @property
-    def data_range(self) -> units.ValueRange:
-        return units.ValueRange(min=0, max=2**self.bit_depth - 1)
+    def data_range(self) -> units.IntRange:
+        return units.IntRange(min=0, max=2**self.bit_depth - 1)
 
     @property
     def trigger_mode(self):
