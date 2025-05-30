@@ -2,7 +2,7 @@ import time
 from enum import Enum, IntEnum
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import LineScanCamera
+from dirigo.hw_interfaces.camera import LineScanCamera, FrameGrabber
 
 
 class AnalogGainOptions(IntEnum):
@@ -20,6 +20,10 @@ class TriggerModes(Enum):
 class E2VUNiiQAPlusColor(LineScanCamera):
     def __init__(self, **kwargs):
         super().__init__(**kwargs) # This will load the frame grabber if available
+
+        if self._frame_grabber is None:
+            raise RuntimeError(f"{self.__class__} requires an initialized framegrabber.")
+        self._frame_grabber: FrameGrabber
 
     @property
     def integration_time(self) -> units.Time:
@@ -55,7 +59,7 @@ class E2VUNiiQAPlusColor(LineScanCamera):
         cmd = "r pamp\r"
         self._frame_grabber.serial_write(cmd)
         gain_mode = self._frame_grabber.serial_read()
-        return self.analog_gain_lookup.get(int(gain_mode))
+        return self.analog_gain_lookup[int(gain_mode)]
     
     @gain.setter
     def gain(self, new_mode):
@@ -114,6 +118,10 @@ class E2VUNiiQAPlusColor(LineScanCamera):
 class E2VAViiVAM2(LineScanCamera):
     def __init__(self, **kwargs):
         super().__init__(**kwargs) # This will load the frame grabber if available
+
+        if self._frame_grabber is None:
+            raise RuntimeError(f"{self.__class__} requires an initialized framegrabber.")
+        self._frame_grabber: FrameGrabber
 
     @property
     def integration_time(self) -> units.Time:
@@ -211,7 +219,7 @@ class E2VAViiVAM2(LineScanCamera):
 
         return_str = str()
         while True:
-            return_char = self._frame_grabber.serial_read_nbytes(1)
+            return_char = self._frame_grabber.serial_read(nbytes=1)
             return_str = return_str + return_char
             if len(return_str) > 2 and return_str[-2:] == "OK":
                 break
