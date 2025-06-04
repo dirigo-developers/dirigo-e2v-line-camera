@@ -2,7 +2,7 @@ import time
 from enum import Enum, IntEnum
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import LineScanCamera, FrameGrabber
+from dirigo.hw_interfaces.camera import LineCamera, FrameGrabber
 
 
 class AnalogGainOptions(IntEnum):
@@ -17,7 +17,7 @@ class TriggerModes(Enum):
     # note 2 additional modes not implemented
 
 
-class E2VUNiiQAPlusColor(LineScanCamera):
+class E2VUNiiQAPlusColor(LineCamera):
     def __init__(self, **kwargs):
         super().__init__(**kwargs) # This will load the frame grabber if available
 
@@ -115,7 +115,7 @@ class E2VUNiiQAPlusColor(LineScanCamera):
         pass
 
 
-class E2VAViiVAM2(LineScanCamera):
+class E2VAViiVAM2(LineCamera):
     def __init__(self, **kwargs):
         super().__init__(**kwargs) # This will load the frame grabber if available
 
