@@ -1,7 +1,7 @@
-import time
+import time, math
 from enum import Enum, IntEnum
 
-from dirigo import units
+from dirigo import units, io
 from dirigo.hw_interfaces.camera import LineCamera, FrameGrabber
 
 
@@ -137,12 +137,64 @@ class E2VAViiVAM2(LineCamera):
         assert self._frame_grabber.serial_read() == ">OK\r"
     
     @property
-    def gain(self):
-        pass
-
+    def gain(self) -> float:
+        """ Get gain, in magnitude """
+        data_dict = self._get_current_settings()
+        gain_db = int(data_dict["G"]) * 0.047
+        return 10**(gain_db/20)
+    
     @gain.setter
-    def gain(self, value):
-        pass
+    def gain(self, gain: float):
+        gain_db = 20 * math.log10(gain)
+        gain = round(gain_db / 0.047)
+        self._frame_grabber.serial_write(f"G={gain}\r")
+        assert self._frame_grabber.serial_read() == ">OK\r"
+
+    @property
+    def _even_offset(self) -> int:
+        data_dict = self._get_current_settings()
+        return int(data_dict["O"])
+    
+    @_even_offset.setter
+    def _even_offset(self, new_offset: int):
+        self._frame_grabber.serial_write(f"O={new_offset}\r")
+        response = self._frame_grabber.serial_read() 
+        assert response == ">OK\r", f"Unexpected serial response: {response}"
+    
+    @property
+    def _odd_offset(self) -> int:
+        data_dict = self._get_current_settings()
+        return int(data_dict["P"])
+    
+    @_odd_offset.setter
+    def _odd_offset(self, new_offset: int):
+        self._frame_grabber.serial_write(f"P={new_offset}\r")
+        response = self._frame_grabber.serial_read() 
+        assert response == ">OK\r", f"Unexpected serial response: {response}"
+
+    @property
+    def _even_gain(self) -> int:
+        """ Gain mismatch correction. Settings 0-20. """
+        data_dict = self._get_current_settings()
+        return int(data_dict["A"])
+    
+    @_even_gain.setter
+    def _even_gain(self, new_gain: int):
+        self._frame_grabber.serial_write(f"A={new_gain}\r")
+        response = self._frame_grabber.serial_read() 
+        assert response == ">OK\r", f"Unexpected serial response: {response}"
+    
+    @property
+    def _odd_gain(self) -> int:
+        """ Gain mismatch correction. Settings 0-20. """
+        data_dict = self._get_current_settings()
+        return int(data_dict["B"])
+    
+    @_odd_gain.setter
+    def _odd_gain(self, new_gain: int):
+        self._frame_grabber.serial_write(f"B={new_gain}\r")
+        response = self._frame_grabber.serial_read() 
+        assert response == ">OK\r", f"Unexpected serial response: {response}"
 
     @property
     def bit_depth(self) -> int:
@@ -208,6 +260,16 @@ class E2VAViiVAM2(LineCamera):
 
     def stop(self):
         pass
+
+    def load_profile(self):
+        profile = io.load_toml(
+            io.config_path() / "line_camera/default_profile.toml"
+        )
+        self.gain           = profile['gain']
+        self._even_offset   = profile['even_offset']
+        self._odd_offset    = profile['odd_offset']
+        self._even_gain     = profile['even_gain']
+        self._odd_gain      = profile['odd_gain']
 
     def _get_current_settings(self) -> dict:
         """
