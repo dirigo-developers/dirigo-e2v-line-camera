@@ -1,5 +1,6 @@
 import time, math
 from enum import Enum, IntEnum
+from typing import Literal
 
 from dirigo import units, io
 from dirigo.hw_interfaces.camera import LineCamera, FrameGrabber
@@ -45,28 +46,19 @@ class E2VUNiiQAPlusColor(LineCamera):
         self._frame_grabber.serial_write(cmd)
         return_code = self._frame_grabber.serial_read()
 
-    analog_gain_options = {
-        "1x" : 0,
-        "2x" : 1,
-        "4x" : 2
-    }
-    analog_gain_lookup = {
-        v: k for k, v in analog_gain_options.items()
-    }
-
     @property
-    def gain(self) -> str: # TODO change this property over to "analog_gain"
-        cmd = "r pamp\r"
-        self._frame_grabber.serial_write(cmd)
+    def gain(self) -> Literal[1, 2, 4]:
+        """Returns gain magnitude (either 1, 2, or 4). """
+        self._frame_grabber.serial_write("r pamp\r")
         gain_mode = self._frame_grabber.serial_read()
-        return self.analog_gain_lookup[int(gain_mode)]
+        return 2**int(gain_mode)
     
     @gain.setter
-    def gain(self, new_mode):
-        new_mode = f"{int(new_mode)}x"
-        mode_number = self.analog_gain_options.get(new_mode)
-        cmd = f"w pamp {mode_number}\r"
-        self._frame_grabber.serial_write(cmd)
+    def gain(self, new_gain: Literal[1, 2, 4]):
+        """Set the gain magnitude (allowed: 1, 2, or 4)"""
+        if new_gain not in {1, 2, 4}:
+            raise ValueError(f"Setting gain to {new_gain} is not supported")
+        self._frame_grabber.serial_write(f"w pamp {int(math.log2(new_gain))}\r")
         return_code = self._frame_grabber.serial_read()
 
     @property
@@ -88,7 +80,7 @@ class E2VUNiiQAPlusColor(LineCamera):
         """
         cmd = "r sync\r"
         self._frame_grabber.serial_write(cmd)
-        mode_number = self._frame_grabber.serial_read()
+        mode_number = int(self._frame_grabber.serial_read().strip())
         if mode_number == 0:
             return TriggerModes.FREE_RUN
         elif mode_number == 1:
@@ -112,6 +104,37 @@ class E2VUNiiQAPlusColor(LineCamera):
         pass
 
     def stop(self):
+        pass
+
+    def load_profile(self):
+        profile = io.load_toml(
+            io.config_path() / "line_camera/default_profile.toml"
+        )
+        self.gain           = profile['gain']
+        self._sensor_mode   = profile['sensor_mode']
+
+    @property
+    def _sensor_mode(self) -> Literal['4096 pixels, 5x5 µm', '2048 pixels, 10x10 µm']:
+        """Returns sensor mode (either '4096 pixels, 5x5 µm' or '2048 pixels, 10x10 µm'). """
+        self._frame_grabber.serial_write("r smod\r")
+        sensor_mode = self._frame_grabber.serial_read()
+        if sensor_mode == 0:
+            return '4096 pixels, 5x5 µm'
+        elif sensor_mode == 1:
+            return '2048 pixels, 10x10 µm'
+        else:
+            raise RuntimeError("Unsupported sensor mode currently set")
+        
+    @_sensor_mode.setter
+    def _sensor_mode(self, new_mode: Literal['4096 pixels, 5x5 µm', '2048 pixels, 10x10 µm']):
+        if new_mode == '4096 pixels, 5x5 µm':
+            sensor_mode = 0
+        elif new_mode == '2048 pixels, 10x10 µm':
+            sensor_mode = 1
+        self._frame_grabber.serial_write(f"w smod {sensor_mode}\r")
+        return_code = self._frame_grabber.serial_read()
+
+    def _scan_direction(self):
         pass
 
 
