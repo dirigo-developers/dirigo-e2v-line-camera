@@ -20,11 +20,13 @@ class TriggerModes(Enum):
 
 class E2VUNiiQAPlusColor(LineCamera):
     def __init__(self, **kwargs):
-        super().__init__(**kwargs) # This will load the frame grabber if available
+        super().__init__(**kwargs) # This will load the frame grabber, if available
 
         if self._frame_grabber is None:
             raise RuntimeError(f"{self.__class__} requires an initialized framegrabber.")
         self._frame_grabber: FrameGrabber
+
+        self.white_balance_enabled = True
 
     @property
     def integration_time(self) -> units.Time:
@@ -141,23 +143,21 @@ class E2VUNiiQAPlusColor(LineCamera):
     def white_balance_enabled(self) -> bool:
         self._frame_grabber.serial_write("r gwbe\r")
         enabled = self._frame_grabber.serial_read()
-        return enabled == 1
+        return enabled.strip() == '1'
     
     @white_balance_enabled.setter
     def white_balance_enabled(self, enabled: bool) -> None:
-        self._frame_grabber.serial_write(f"w gwbe {enabled}\r")
+        self._frame_grabber.serial_write(f"w gwbe {1 if enabled else 0}\r")
         return_code = self._frame_grabber.serial_read()
 
     def start_auto_white_balance(self) -> None:
         """Begins built-in auto white balance calibration. Blocks until done."""
-        self._frame_grabber.serial_write("w awbc\r")
+        self._frame_grabber.serial_write("w awbc 1\r")
         return_code = self._frame_grabber.serial_read()
 
-        # Wait until camera indicates it's done
-        running = True
-        while running:
-            self._frame_grabber.serial_write("r awbc\r")
-            running = self._frame_grabber.serial_read() == 1
+    def stop_auto_white_balance(self) -> None:
+        self._frame_grabber.serial_write("w awbc 0\r")
+        return_code = self._frame_grabber.serial_read()
 
     @property
     def white_balance_gains(self):
@@ -166,7 +166,7 @@ class E2VUNiiQAPlusColor(LineCamera):
             return self._frame_grabber.serial_read()
         
         colors = ('r', 'b', 'g', 'j')
-        return {c : write_read(f"w gwb{c}\r") for c in colors}
+        return {c : write_read(f"r gwb{c}\r") for c in colors}
 
 
 
