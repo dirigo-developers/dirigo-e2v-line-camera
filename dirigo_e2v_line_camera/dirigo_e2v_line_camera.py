@@ -137,6 +137,38 @@ class E2VUNiiQAPlusColor(LineCamera):
     def _scan_direction(self):
         pass
 
+    @property
+    def white_balance_enabled(self) -> bool:
+        self._frame_grabber.serial_write("r gwbe\r")
+        enabled = self._frame_grabber.serial_read()
+        return enabled == 1
+    
+    @white_balance_enabled.setter
+    def white_balance_enabled(self, enabled: bool) -> None:
+        self._frame_grabber.serial_write(f"w gwbe {enabled}\r")
+        return_code = self._frame_grabber.serial_read()
+
+    def start_auto_white_balance(self) -> None:
+        """Begins built-in auto white balance calibration. Blocks until done."""
+        self._frame_grabber.serial_write("w awbc\r")
+        return_code = self._frame_grabber.serial_read()
+
+        # Wait until camera indicates it's done
+        running = True
+        while running:
+            self._frame_grabber.serial_write("r awbc\r")
+            running = self._frame_grabber.serial_read() == 1
+
+    @property
+    def white_balance_gains(self):
+        def write_read(command):
+            self._frame_grabber.serial_write(command)
+            return self._frame_grabber.serial_read()
+        
+        colors = ('r', 'b', 'g', 'j')
+        return {c : write_read(f"w gwb{c}\r") for c in colors}
+
+
 
 class E2VAViiVAM2(LineCamera):
     def __init__(self, **kwargs):
