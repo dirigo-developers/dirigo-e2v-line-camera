@@ -151,7 +151,9 @@ class E2VUNiiQAPlusColor(LineCamera):
         return_code = self._frame_grabber.serial_read()
 
     def start_auto_white_balance(self) -> None:
-        """Begins built-in auto white balance calibration. Blocks until done."""
+        """Begins built-in auto white balance calibration.
+        
+        Note this requires some data to be acquired in order for it to work."""
         self._frame_grabber.serial_write("w awbc 1\r")
         return_code = self._frame_grabber.serial_read()
 
