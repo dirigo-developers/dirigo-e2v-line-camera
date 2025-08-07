@@ -3,19 +3,13 @@ from enum import Enum, IntEnum
 from typing import Literal
 
 from dirigo import units, io
-from dirigo.hw_interfaces.camera import LineCamera, FrameGrabber
+from dirigo.hw_interfaces.camera import LineCamera, FrameGrabber, TriggerModes
 
 
 class AnalogGainOptions(IntEnum):
     X1 = 0
     X2 = 1
     X4 = 2
-
-
-class TriggerModes(Enum):
-    FREE_RUN            = 0
-    EXTERNAL_TRIGGER    = 1
-    # note 2 additional modes not implemented
 
 
 class E2VUNiiQAPlusColor(LineCamera):
@@ -92,6 +86,7 @@ class E2VUNiiQAPlusColor(LineCamera):
 
     @trigger_mode.setter
     def trigger_mode(self, new_mode: TriggerModes):
+        # Map Dirigo.Camera.TriggerModes to e2v mode numbers
         if new_mode == TriggerModes.FREE_RUN:
             mode_number = 0
         elif new_mode == TriggerModes.EXTERNAL_TRIGGER:
