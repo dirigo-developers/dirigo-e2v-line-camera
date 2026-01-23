@@ -4,19 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dirigo_e2v_line_camera"
-version = "0.1.1"
-description = "Plugin to use E2V and Atmel line-scan cameras with Dirigo."
+version = "0.2.0"
+description = "Plugin to use Teledyne e2v (and previous Atmel) line-scan cameras with Dirigo."
 authors = [
     {name = "T. D. Weber", email = "tweber@mit.edu"}
 ]
 license = {text = "MIT"}
 dependencies = []
 
-# deprecated
-[project.entry-points."dirigo_line_cameras"]
-uniiqa_plus_color = "dirigo_e2v_line_camera:E2VUNiiQAPlusColor"
-aviiva_m2 = "dirigo_e2v_line_camera:E2VAViiVAM2"
 
 [project.entry-points."dirigo.devices.line_camera"]
-uniiqa_plus_color = "dirigo_e2v_line_camera:E2VUNiiQAPlusColor"
-aviiva_m2 = "dirigo_e2v_line_camera:E2VAViiVAM2"
+uniiqa_plus_color = "dirigo_e2v_line_camera:UniiqaPlusColor"
+aviiva_m2 = "dirigo_e2v_line_camera:AviivaM2"
