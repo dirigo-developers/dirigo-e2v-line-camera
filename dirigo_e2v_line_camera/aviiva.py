@@ -4,7 +4,7 @@ import re
 from pydantic import Field
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import LineCameraSettings, TriggerMode, PixelFormat, LineDirection
+from dirigo.hw_interfaces.camera import LineCameraSettings, TriggerMode, PixelFormat, ScanDirection
 from .base import E2VLineCameraConfig, E2VLineCamera, SerialControl
 
 
@@ -33,7 +33,7 @@ class AviivaM2(E2VLineCamera):
     def __init__(self, cfg: AviivaM2Config, *, transport: SerialControl, **kwargs):
         super().__init__(cfg, transport=transport, **kwargs)
 
-        self._line_direction = LineDirection.FORWARD # has no effect on camera since it's only a single row of pixels
+        self._scan_direction = ScanDirection.FORWARD # has no effect on camera since it's only a single row of pixels
 
     # do not override _connect_impl and _close_impl to leave as no-op defaults
     
@@ -183,15 +183,15 @@ class AviivaM2(E2VLineCamera):
         return (TriggerMode.FREE_RUN, TriggerMode.EXTERNAL_TRIGGER)
     
     @property
-    def line_direction(self) -> LineDirection:
-        return self._line_direction
+    def scan_direction(self) -> ScanDirection:
+        return self._scan_direction
 
         
-    @line_direction.setter
-    def line_direction(self, d: LineDirection):
-        if not isinstance(d, LineDirection):
+    @scan_direction.setter
+    def scan_direction(self, d: ScanDirection):
+        if not isinstance(d, ScanDirection):
             raise ValueError(f"Invalid line direction, got {d}")
-        self._line_direction = d
+        self._scan_direction = d
 
     # ---- Even/odd gain/offset helpers ----
     # Since there are 2 separate taps (ADCs), they may require a bit of calibration
@@ -316,7 +316,7 @@ class AviivaM2(E2VLineCamera):
             gain                = 10 ** ( gain_db / 20 ),
             trigger_mode        = tm,
             pixel_format        = pf,
-            line_direction      = self.line_direction,
+            scan_direction      = self.scan_direction,
             even_gain           = int(d["A"]),
             odd_gain            = int(d["B"]),
             even_offset         = int(d["O"]),

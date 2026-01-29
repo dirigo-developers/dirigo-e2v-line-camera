@@ -6,7 +6,7 @@ from pydantic import Field
 
 from dirigo import units
 from dirigo.hw_interfaces.hw_interface import SettingNotSettableError
-from dirigo.hw_interfaces.camera import LineCameraSettings, TriggerMode, PixelFormat, LineDirection
+from dirigo.hw_interfaces.camera import LineCameraSettings, TriggerMode, PixelFormat, ScanDirection
 from .base import E2VLineCameraConfig, E2VLineCamera, SerialControl
 
 
@@ -169,19 +169,19 @@ class UniiqaPlusColor(E2VLineCamera):
         return (TriggerMode.FREE_RUN, TriggerMode.EXTERNAL_TRIGGER)
 
     @property
-    def line_direction(self) -> LineDirection:
+    def scan_direction(self) -> ScanDirection:
         self._write("r scdi\r")
         mode_number = int(self._read().strip())
         if mode_number == 0:
-            return LineDirection.FORWARD
+            return ScanDirection.FORWARD
         else:
-            return LineDirection.REVERSE
+            return ScanDirection.REVERSE
         
-    @line_direction.setter
-    def line_direction(self, d: LineDirection):
-        if not isinstance(d, LineDirection):
-            raise ValueError("Line direction must be set by with LineDirection enumeration.")
-        if d == LineDirection.FORWARD:
+    @scan_direction.setter
+    def scan_direction(self, d: ScanDirection):
+        if not isinstance(d, ScanDirection):
+            raise ValueError("Line direction must be set by with ScanDirection enumeration.")
+        if d == ScanDirection.FORWARD:
             self._write(f"w scdi 0\r")
         else:
             self._write(f"w scdi 1\r")
