@@ -3,7 +3,7 @@ from dirigo.hw_interfaces.geometry import GlobalAxes
 
 from dirigo_ni_frame_grabber.dirigo_ni_frame_grabber import NIFrameGrabber, NIFrameGrabberConfig
 
-from dirigo_e2v_line_camera.uniiqa import UniiqaPlusColorConfig, UniiqaPlusColor
+#from dirigo_e2v_line_camera.uniiqa import UniiqaPlusColorConfig, UniiqaPlusColor
 from dirigo_e2v_line_camera.aviiva import AviivaM2Config, AviivaM2
 
 # Make framegrabber
@@ -15,17 +15,17 @@ fg = NIFrameGrabber(cfg)
 fg.connect()
 
 # Make camera
-cfg = UniiqaPlusColorConfig(
-    axis       = GlobalAxes.X
-)
-cam = UniiqaPlusColor(cfg, transport=fg)
-
-
-# cfg = AviivaM2Config(
+# cfg = UniiqaPlusColorConfig(
 #     axis       = GlobalAxes.X
 # )
-# cam = AviivaM2(cfg, transport=fg)
-# cid = cam._camera_identification_readout()
+# cam = UniiqaPlusColor(cfg, transport=fg)
+
+
+cfg = AviivaM2Config(axis=GlobalAxes.Y)
+cam = AviivaM2(cfg, transport=fg)
+cam.connect()
+
+
 
 
 a=1

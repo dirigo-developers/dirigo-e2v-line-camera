@@ -4,20 +4,30 @@ import re
 from pydantic import Field
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import TriggerModes
-from .base import E2VSerialLineCameraConfig, E2VSerialLineCamera, SerialControl
+from dirigo.hw_interfaces.camera import CameraSettings, TriggerMode, PixelFormat
+from .base import E2VLineCameraConfig, E2VLineCamera, SerialControl
 
 
 
-class AviivaM2Config(E2VSerialLineCameraConfig):
+class AviivaM2Config(E2VLineCameraConfig):
+    # Hide pixel size because it will be introspected
     pixel_size: None = Field(
         default           = None,
         json_schema_extra = {"ui": {"hidden": True}},
     )
 
 
-class AviivaM2(E2VSerialLineCamera):
+class AviivaM2Settings(CameraSettings):
+    """AviivaM2-specific device settings"""
+    even_gain: int | None = None
+    odd_gain: int | None = None
+    even_offset: int | None = None
+    odd_offset: int | None = None
+
+
+class AviivaM2(E2VLineCamera):
     config_model = AviivaM2Config
+    settings_model = AviivaM2Settings
     title = "e2v AViiVA M2 CL"
 
     def __init__(self, cfg: AviivaM2Config, *, transport: SerialControl, **kwargs):
@@ -65,12 +75,22 @@ class AviivaM2(E2VSerialLineCamera):
         return units.Time(int(d["I"]) * 1e-6)
 
     @integration_time.setter
-    def integration_time(self, time_value: units.Time) -> None:
-        if not isinstance(time_value, units.Time):
-            raise ValueError(f"Integration time must be set with units.Time instance, got {type(time_value)}")
-        time_us = round(float(time_value) * 1e6)
+    def integration_time(self, t: units.Time) -> None:
+        if not isinstance(t, units.Time):
+            raise ValueError(f"Integration time must be set with units.Time instance, got {type(t)}")
+        if not self.integration_time_range.within_range(t):
+            raise ValueError(f"Integration time outside settable range. Got: {t} "
+                             f"Settable range: {self.integration_time_range}")
+        time_us = round(float(t) * 1e6)
         self._write(f"I={time_us}\r")
         self._expect_ok()
+
+    @property
+    def integration_time_range(self) -> units.TimeRange:
+        return units.TimeRange(
+            min = units.Time("5 us"), 
+            max = units.Time("13 ms")
+        )
 
     @property
     def gain(self) -> float:
@@ -79,97 +99,127 @@ class AviivaM2(E2VSerialLineCamera):
         return 10 ** (gain_db / 20)
 
     @gain.setter
-    def gain(self, gain_value: float) -> None:
-        gain_db = 20 * math.log10(gain_value)
+    def gain(self, g: float) -> None:
+        if not isinstance(g, float):
+            raise ValueError(f"Gain must be set with float instance, got {type(g)}")
+        #sg = cast(units.FloatRange, self.supported_gains)
+        if not self.supported_gains.within_range(g):
+            raise ValueError(f"Gain outside settable range. Got: {g} "
+                             f"Settable range: {self.supported_gains}")
+        
+        gain_db = 20 * math.log10(g)
         code = round(gain_db / 0.047)
         self._write(f"G={code}\r")
         self._expect_ok()
 
     @property
-    def bit_depth(self) -> int:
+    def supported_gains(self) -> units.FloatRange:
+        return units.FloatRange(
+            min = 1,   # 0 dB
+            max = 100  # 40 dB
+        )
+
+    @property
+    def pixel_format(self) -> PixelFormat:
         d = self._camera_configuration_readout()
         code = int(d["S"])
         if code == 0:
-            return 12
-        if code == 1:
-            return 10
-        return 8
+            return PixelFormat.MONO12
+        elif code == 1:
+            return PixelFormat.MONO10
+        elif code == 2:
+            return PixelFormat.MONO8
+        else:
+            raise RuntimeError(f"Unsupported pixel format code, {code}")
 
-    @bit_depth.setter
-    def bit_depth(self, bits: int) -> None:
-        code = {12: 0, 10: 1, 8: 2}.get(bits)
-        if code is None:
-            raise ValueError(f"Bits per pixel can be 8, 10, or 12. Got {bits}")
-        self._write(f"S={code}\r")
+    @pixel_format.setter
+    def pixel_format(self, f: int) -> None:
+        if f not in self.supported_pixel_formats:
+            raise ValueError(f"Unsupported pixel format. Got {f}. "
+                             f"Supported: {self.supported_pixel_formats}")
+        
+        if f == PixelFormat.MONO12:
+            self._write(f"S=0\r")
+        elif f == PixelFormat.MONO10:
+            self._write(f"S=1\r")
+        else:
+            self._write(f"S=2\r")
+        
         self._expect_ok()
 
     @property
-    def data_range(self) -> units.IntRange:
-        return units.IntRange(min=0, max=2**self.bit_depth - 1)
+    def supported_pixel_formats(self) -> tuple[PixelFormat, ...]:
+        return (
+            PixelFormat.MONO12,
+            PixelFormat.MONO10,
+            PixelFormat.MONO8,
+        )
 
     @property
-    def trigger_mode(self) -> TriggerModes:
+    def trigger_mode(self) -> TriggerMode:
         d = self._camera_configuration_readout()
         code = int(d["M"])
         if code == 1:
-            return TriggerModes.FREE_RUN
-        if code == 2:
-            return TriggerModes.EXTERNAL_TRIGGER
+            return TriggerMode.FREE_RUN
+        elif code == 2:
+            return TriggerMode.EXTERNAL_TRIGGER
         raise RuntimeError(f"Unsupported trigger mode code: {code}")
 
     @trigger_mode.setter
-    def trigger_mode(self, new_mode: TriggerModes) -> None:
-        if new_mode == TriggerModes.FREE_RUN:
-            code = 1
-        elif new_mode == TriggerModes.EXTERNAL_TRIGGER:
-            code = 2
+    def trigger_mode(self, m: TriggerMode) -> None:
+        if m not in self.supported_trigger_modes:
+            raise ValueError(f"Unsupported trigger mode: {m}. "
+                             f"Supported: {self.supported_trigger_modes}")
+        if m == TriggerMode.FREE_RUN:
+            self._write(f"M=1\r")
         else:
-            raise ValueError(f"Unsupported trigger mode: {new_mode}")
-        self._write(f"M={code}\r")
+            self._write(f"M=2\r")
+        
         self._expect_ok()
 
-    def load_profile(self) -> None:
-        pass
+    @property
+    def supported_trigger_modes(self) -> tuple[TriggerMode, ...]:
+        return (TriggerMode.FREE_RUN, TriggerMode.EXTERNAL_TRIGGER)
 
     # ---- Even/odd gain/offset helpers ----
     # Since there are 2 separate taps (ADCs), they may require a bit of calibration
     @property
-    def _even_gain(self) -> int:
+    def even_gain(self) -> int:
         data_dict = self._camera_configuration_readout()
         return int(data_dict["A"])
     
-    @_even_gain.setter
-    def _even_gain(self, new_gain: int):
+    @even_gain.setter
+    def even_gain(self, new_gain: int):
         self._write(f"A={new_gain}\r")
         self._expect_ok()
 
     @property
-    def _odd_gain(self) -> int:
+    def odd_gain(self) -> int:
         data_dict = self._camera_configuration_readout()
         return int(data_dict["B"])
     
-    @_odd_gain.setter
-    def _odd_gain(self, new_gain: int):
+    @odd_gain.setter
+    def odd_gain(self, new_gain: int):
         self._write(f"B={new_gain}\r")
         self._expect_ok()
 
     @property
-    def _even_offset(self) -> int:
+    def even_offset(self) -> int:
         data_dict = self._camera_configuration_readout()
         return int(data_dict["O"])
     
-    @_even_offset.setter
-    def _even_offset(self, new_offset: int):
+    @even_offset.setter
+    def even_offset(self, new_offset: int):
         self._write(f"O={new_offset}\r")
         self._expect_ok()
 
     @property
-    def _odd_offset(self) -> int:
+    def odd_offset(self) -> int:
         data_dict = self._camera_configuration_readout()
         return int(data_dict["P"])
     
-    @_odd_offset.setter
-    def _odd_offset(self, new_offset: int):
+    @odd_offset.setter
+    def odd_offset(self, new_offset: int):
         self._write(f"P={new_offset}\r")
         self._expect_ok()
 
@@ -224,15 +274,51 @@ class AviivaM2(E2VSerialLineCamera):
         out["version"] = parts[4]
 
         return out
+    
+    def snapshot_settings(self) -> AviivaM2Settings:
+        # Shadow multi getter default in favor of returning most settings with 1 call
+        d = self._camera_configuration_readout() # not to be confused with the DeviceConfig (only properties needed for instantiation)
+        
+        gain_db = int(d["G"]) * 0.047
+
+        code = int(d["M"])
+        if code == 1:
+            tm = TriggerMode.FREE_RUN
+        elif code == 2:
+            tm = TriggerMode.EXTERNAL_TRIGGER
+        else:
+            raise RuntimeError(f"Unsupported trigger mode code: {code}")
+        
+        code = int(d["S"])
+        if code == 0:
+            pf = PixelFormat.MONO12
+        elif code == 1:
+            pf = PixelFormat.MONO10
+        elif code == 2:
+            pf =  PixelFormat.MONO8
+        else:
+            raise RuntimeError(f"Unsupported bit depth code, {code}")
+
+        return AviivaM2Settings(
+            integration_time    = units.Time(int(d["I"]) * 1e-6),
+            gain                = 10 ** ( gain_db / 20 ),
+            trigger_mode        = tm,
+            pixel_format        = pf,
+            even_gain           = int(d["A"]),
+            odd_gain            = int(d["B"]),
+            even_offset         = int(d["O"]),
+            odd_offset          = int(d["P"])
+        )
 
 
-class AviivaM4(E2VSerialLineCamera):
+class AviivaM4(E2VLineCamera):
     ...
 
 
-class AviivaSM2(E2VSerialLineCamera):
+class AviivaSM2(E2VLineCamera):
     ...
+    # integration time range: 1 us to 32768 us
 
 
-class AviivaEM(E2VSerialLineCamera):
+class AviivaEM(E2VLineCamera):
     ...

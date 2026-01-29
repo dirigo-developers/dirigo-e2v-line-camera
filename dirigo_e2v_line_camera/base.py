@@ -7,7 +7,7 @@ from dirigo.hw_interfaces.camera import LineCameraConfig, LineCamera
 
 
 
-class E2VSerialLineCameraConfig(LineCameraConfig):
+class E2VLineCameraConfig(LineCameraConfig):
     vendor: str = Field(
         default           = "Teledyne e2v",
         json_schema_extra = {"ui": {"hidden": True}},
@@ -19,12 +19,12 @@ class E2VSerialLineCameraConfig(LineCameraConfig):
     )
 
 
-class E2VSerialLineCamera(LineCamera):
+class E2VLineCamera(LineCamera):
     """
     Shared base for e2v line-scan cameras that are controlled over a serial channel
-    exposed by an ImageTransport (typically a framegrabber).
+    exposed by an ImageTransport (typically a Camera Link frame grabber).
     """
-    config_model: ClassVar[type] = E2VSerialLineCameraConfig
+    config_model: ClassVar[type] = E2VLineCameraConfig
 
     def __init__(self, cfg: LineCameraConfig, *, transport: SerialControl, **kwargs):
         super().__init__(cfg, **kwargs)

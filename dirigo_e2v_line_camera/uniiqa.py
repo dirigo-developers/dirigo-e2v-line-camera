@@ -5,8 +5,8 @@ from enum import StrEnum
 from pydantic import Field
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import  TriggerModes
-from .base import E2VSerialLineCameraConfig, E2VSerialLineCamera, SerialControl
+from dirigo.hw_interfaces.camera import TriggerMode, CameraSettings
+from .base import E2VLineCameraConfig, E2VLineCamera, SerialControl
 
 
 
@@ -17,17 +17,20 @@ class SensorModes(StrEnum):
     TRUE_COLOR_CROPPED_512  = "512 pixels, 10x10 μm"
 
 
-class UniiqaPlusColorConfig(E2VSerialLineCameraConfig):
+class UniiqaPlusColorConfig(E2VLineCameraConfig):
     # Pixel size is introspected (depends on sensor mode)
     pixel_size: None = Field(
         default           = None,
         json_schema_extra = {"ui": {"hidden": True}},
     )
 
+class UniiqaPlusColorSettings(CameraSettings):
+    sensor_mode: SensorModes | None = None
 
-# TODO, should this be only CameraLink?
-class UniiqaPlusColor(E2VSerialLineCamera):
+
+class UniiqaPlusColor(E2VLineCamera):
     config_model = UniiqaPlusColorConfig
+    settings_model = UniiqaPlusColorSettings
     title = "e2v UNiiQA+ Color CL"
 
     def __init__(self, cfg: UniiqaPlusColorConfig, *, transport: SerialControl, **kwargs):
@@ -55,14 +58,14 @@ class UniiqaPlusColor(E2VSerialLineCamera):
     # ---- Sensor geometry ----
     @property
     def pixel_size(self) -> units.Position:
-        if self._sensor_mode == SensorModes.FULL_DEF:
+        if self.sensor_mode == SensorModes.FULL_DEF:
             return units.Position("5 μm")
         else:
             return units.Position("10 μm")
 
     @property
     def image_width_px(self) -> int:
-        sm = self._sensor_mode
+        sm = self.sensor_mode
         if sm == SensorModes.FULL_DEF:
             return 4096
         elif sm == SensorModes.TRUE_COLOR:
@@ -103,20 +106,20 @@ class UniiqaPlusColor(E2VSerialLineCamera):
         _ = self._read()
 
     @property
-    def trigger_mode(self) -> TriggerModes:
+    def trigger_mode(self) -> TriggerMode:
         self._write("r sync\r")
         mode_number = int(self._read().strip())
         if mode_number == 0:
-            return TriggerModes.FREE_RUN
+            return TriggerMode.FREE_RUN
         if mode_number == 1:
-            return TriggerModes.EXTERNAL_TRIGGER
+            return TriggerMode.EXTERNAL_TRIGGER
         raise RuntimeError(f"Unsupported trigger mode code: {mode_number}")
 
     @trigger_mode.setter
-    def trigger_mode(self, new_mode: TriggerModes) -> None:
-        if new_mode == TriggerModes.FREE_RUN:
+    def trigger_mode(self, new_mode: TriggerMode) -> None:
+        if new_mode == TriggerMode.FREE_RUN:
             mode_number = 0
-        elif new_mode == TriggerModes.EXTERNAL_TRIGGER:
+        elif new_mode == TriggerMode.EXTERNAL_TRIGGER:
             mode_number = 1
         else:
             raise ValueError(f"Unsupported trigger mode: {new_mode}")
@@ -136,19 +139,16 @@ class UniiqaPlusColor(E2VSerialLineCamera):
     def data_range(self) -> units.IntRange:
         # Per channel range
         return units.IntRange(min=0, max=255)
-    
-    def load_profile(self) -> None:
-        pass
 
     # ---- Camera-specific extras ----
     @property
-    def _sensor_mode(self) -> SensorModes:
+    def sensor_mode(self) -> SensorModes:
         self._write("r smod\r")
         code = int(self._read().strip())
         return list(SensorModes)[code]
     
-    @_sensor_mode.setter
-    def _sensor_mode(self, mode: SensorModes) -> None:
+    @sensor_mode.setter
+    def sensor_mode(self, mode: SensorModes) -> None:
         if not isinstance(mode, SensorModes):
             raise ValueError("Sensor mode must be set with a SensorMode enumeration")
         code = list(SensorModes).index(mode)
