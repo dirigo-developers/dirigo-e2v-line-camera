@@ -5,7 +5,8 @@ from enum import StrEnum
 from pydantic import Field
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import TriggerMode, CameraSettings
+from dirigo.hw_interfaces.hw_interface import SettingNotSettableError
+from dirigo.hw_interfaces.camera import LineCameraSettings, TriggerMode, PixelFormat, LineDirection
 from .base import E2VLineCameraConfig, E2VLineCamera, SerialControl
 
 
@@ -24,7 +25,9 @@ class UniiqaPlusColorConfig(E2VLineCameraConfig):
         json_schema_extra = {"ui": {"hidden": True}},
     )
 
-class UniiqaPlusColorSettings(CameraSettings):
+
+class UniiqaPlusColorSettings(LineCameraSettings):
+    """UNiiQA+ Color-specific device settings"""
     sensor_mode: SensorModes | None = None
 
 
@@ -86,10 +89,22 @@ class UniiqaPlusColor(E2VLineCamera):
         return units.Time(int(resp) * 1e-7)
     
     @integration_time.setter
-    def integration_time(self, new_time: units.Time):
-        ticks = int(float(new_time) * 1e7)
+    def integration_time(self, t: units.Time):
+        if not isinstance(t, units.Time):
+            raise ValueError(f"Integration time must be set with units.Time instance, got {type(t)}")
+        if not self.integration_time_range.within_range(t):
+            raise ValueError(f"Integration time outside settable range. Got: {t} "
+                             f"Settable range: {self.integration_time_range}")
+        ticks = int(float(t) * 1e7)
         self._write(f"w tint {ticks}\r")
         _ = self._read()
+
+    @property
+    def integration_time_range(self) -> units.TimeRange:
+        return units.TimeRange(
+            min = units.Time("1.5 us"),
+            max = units.Time("6.5536 ms")
+        )
 
     @property
     def gain(self) -> Literal[1, 2, 4]:
@@ -98,12 +113,34 @@ class UniiqaPlusColor(E2VLineCamera):
         return 2 ** mode  # 0->1, 1->2, 2->4
 
     @gain.setter
-    def gain(self, new_gain: Literal[1, 2, 4]) -> None:
-        if new_gain not in (1, 2, 4):
-            raise ValueError(f"gain must be 1, 2, or 4. Got {new_gain}")
-        code = int(math.log2(new_gain))
+    def gain(self, g: float) -> None:
+        if not isinstance(g, float):
+            raise ValueError(f"Gain must be set with float instance, got {type(g)}")
+        if g not in self.supported_gains:
+            raise ValueError(f"Gain outside settable options. Got: {g} "
+                             f"Settable options: {self.supported_gains}")
+        code = int(math.log2(g))
         self._write(f"w pamp {code}\r")
         _ = self._read()
+
+    @property
+    def supported_gains(self) -> tuple[float, ...]:
+        return (1.0, 2.0, 4.0)
+    
+    @property
+    def pixel_format(self) -> PixelFormat:
+        return PixelFormat.RGB24 # fixed
+
+    @pixel_format.setter
+    def pixel_format(self, f: PixelFormat) -> None:
+        if f == PixelFormat.RGB24:
+            return
+        else:
+            raise SettingNotSettableError("Pixel format default is RGB24 and is not settable")
+
+    @property
+    def supported_pixel_formats(self) -> tuple[PixelFormat, ...]:
+        return (PixelFormat.RGB24, )
 
     @property
     def trigger_mode(self) -> TriggerMode:
@@ -111,9 +148,10 @@ class UniiqaPlusColor(E2VLineCamera):
         mode_number = int(self._read().strip())
         if mode_number == 0:
             return TriggerMode.FREE_RUN
-        if mode_number == 1:
+        elif mode_number == 1:
             return TriggerMode.EXTERNAL_TRIGGER
-        raise RuntimeError(f"Unsupported trigger mode code: {mode_number}")
+        else:
+            raise RuntimeError(f"Unsupported trigger mode code: {mode_number}")
 
     @trigger_mode.setter
     def trigger_mode(self, new_mode: TriggerMode) -> None:
@@ -127,18 +165,26 @@ class UniiqaPlusColor(E2VLineCamera):
         _ = self._read()
 
     @property
-    def bit_depth(self) -> int:
-        # Delivered as RGB24 (8 bits/channel), though "bit_depth" is ambiguous for packed color.
-        return 24
-
-    @bit_depth.setter
-    def bit_depth(self, value: int) -> None:
-        raise NotImplementedError("Bit depth is not configurable on this camera.")
+    def supported_trigger_modes(self) -> tuple[TriggerMode, ...]:
+        return (TriggerMode.FREE_RUN, TriggerMode.EXTERNAL_TRIGGER)
 
     @property
-    def data_range(self) -> units.IntRange:
-        # Per channel range
-        return units.IntRange(min=0, max=255)
+    def line_direction(self) -> LineDirection:
+        self._write("r scdi\r")
+        mode_number = int(self._read().strip())
+        if mode_number == 0:
+            return LineDirection.FORWARD
+        else:
+            return LineDirection.REVERSE
+        
+    @line_direction.setter
+    def line_direction(self, d: LineDirection):
+        if not isinstance(d, LineDirection):
+            raise ValueError("Line direction must be set by with LineDirection enumeration.")
+        if d == LineDirection.FORWARD:
+            self._write(f"w scdi 0\r")
+        else:
+            self._write(f"w scdi 1\r")
 
     # ---- Camera-specific extras ----
     @property

@@ -4,7 +4,7 @@ import re
 from pydantic import Field
 
 from dirigo import units
-from dirigo.hw_interfaces.camera import CameraSettings, TriggerMode, PixelFormat
+from dirigo.hw_interfaces.camera import LineCameraSettings, TriggerMode, PixelFormat, LineDirection
 from .base import E2VLineCameraConfig, E2VLineCamera, SerialControl
 
 
@@ -17,8 +17,8 @@ class AviivaM2Config(E2VLineCameraConfig):
     )
 
 
-class AviivaM2Settings(CameraSettings):
-    """AviivaM2-specific device settings"""
+class AviivaM2Settings(LineCameraSettings):
+    """Aviiva M2-specific device settings"""
     even_gain: int | None = None
     odd_gain: int | None = None
     even_offset: int | None = None
@@ -32,6 +32,8 @@ class AviivaM2(E2VLineCamera):
 
     def __init__(self, cfg: AviivaM2Config, *, transport: SerialControl, **kwargs):
         super().__init__(cfg, transport=transport, **kwargs)
+
+        self._line_direction = LineDirection.FORWARD # has no effect on camera since it's only a single row of pixels
 
     # do not override _connect_impl and _close_impl to leave as no-op defaults
     
@@ -102,7 +104,6 @@ class AviivaM2(E2VLineCamera):
     def gain(self, g: float) -> None:
         if not isinstance(g, float):
             raise ValueError(f"Gain must be set with float instance, got {type(g)}")
-        #sg = cast(units.FloatRange, self.supported_gains)
         if not self.supported_gains.within_range(g):
             raise ValueError(f"Gain outside settable range. Got: {g} "
                              f"Settable range: {self.supported_gains}")
@@ -180,6 +181,17 @@ class AviivaM2(E2VLineCamera):
     @property
     def supported_trigger_modes(self) -> tuple[TriggerMode, ...]:
         return (TriggerMode.FREE_RUN, TriggerMode.EXTERNAL_TRIGGER)
+    
+    @property
+    def line_direction(self) -> LineDirection:
+        return self._line_direction
+
+        
+    @line_direction.setter
+    def line_direction(self, d: LineDirection):
+        if not isinstance(d, LineDirection):
+            raise ValueError(f"Invalid line direction, got {d}")
+        self._line_direction = d
 
     # ---- Even/odd gain/offset helpers ----
     # Since there are 2 separate taps (ADCs), they may require a bit of calibration
@@ -304,6 +316,7 @@ class AviivaM2(E2VLineCamera):
             gain                = 10 ** ( gain_db / 20 ),
             trigger_mode        = tm,
             pixel_format        = pf,
+            line_direction      = self.line_direction,
             even_gain           = int(d["A"]),
             odd_gain            = int(d["B"]),
             even_offset         = int(d["O"]),
