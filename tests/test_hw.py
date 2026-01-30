@@ -4,7 +4,7 @@ from dirigo.hw_interfaces.geometry import GlobalAxes
 from dirigo_ni_frame_grabber.dirigo_ni_frame_grabber import NIFrameGrabber, NIFrameGrabberConfig
 
 from dirigo_e2v_line_camera.uniiqa import UniiqaPlusColorConfig, UniiqaPlusColor
-from dirigo_e2v_line_camera.aviiva import AviivaM2Config, AviivaM2
+from dirigo_e2v_line_camera.aviiva import AviivaM2Config, AviivaM2, AviivaM2Settings
 
 # Make framegrabber
 cfg = NIFrameGrabberConfig(
