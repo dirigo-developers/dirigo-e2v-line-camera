@@ -6,6 +6,8 @@ from dirigo_ni_frame_grabber.dirigo_ni_frame_grabber import NIFrameGrabber, NIFr
 from dirigo_e2v_line_camera.uniiqa import UniiqaPlusColorConfig, UniiqaPlusColor
 from dirigo_e2v_line_camera.aviiva import AviivaM2Config, AviivaM2, AviivaM2Settings
 
+
+
 # Make framegrabber
 cfg = NIFrameGrabberConfig(
     device_name = "img0"
