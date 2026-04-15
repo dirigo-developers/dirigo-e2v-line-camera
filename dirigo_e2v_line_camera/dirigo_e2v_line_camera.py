@@ -114,7 +114,7 @@ class E2VUNiiQAPlusColor(LineCamera):
     def _sensor_mode(self) -> Literal['4096 pixels, 5x5 µm', '2048 pixels, 10x10 µm']:
         """Returns sensor mode (either '4096 pixels, 5x5 µm' or '2048 pixels, 10x10 µm'). """
         self._frame_grabber.serial_write("r smod\r")
-        sensor_mode = self._frame_grabber.serial_read()
+        sensor_mode = int(self._frame_grabber.serial_read())
         if sensor_mode == 0:
             return '4096 pixels, 5x5 µm'
         elif sensor_mode == 1:
@@ -131,8 +131,28 @@ class E2VUNiiQAPlusColor(LineCamera):
         self._frame_grabber.serial_write(f"w smod {sensor_mode}\r")
         return_code = self._frame_grabber.serial_read()
 
-    def _scan_direction(self):
-        pass
+    @property
+    def _scan_direction(self) -> Literal['forward', 'reverse']:
+        """Returns scan direction, forward or reverse."""
+        self._frame_grabber.serial_write("r scdi\r")
+        direction = int(self._frame_grabber.serial_read())
+        if direction == 0:
+            return 'forward'
+        elif direction == 1:
+            return 'reverse'
+        else:
+            raise RuntimeError("Unsupported scan direction mode: external control")
+
+    @_scan_direction.setter
+    def _scan_direction(self, direction: Literal['forward', 'reverse']):
+        if direction == 'forward':
+            scdi = 0
+        elif direction == 'reverse':
+            scdi = 1
+        else:
+            raise ValueError("Unsupported scan direction")
+        self._frame_grabber.serial_write(f"w scdi {scdi}\r")
+        return_code = self._frame_grabber.serial_read()
 
     @property
     def white_balance_enabled(self) -> bool:
