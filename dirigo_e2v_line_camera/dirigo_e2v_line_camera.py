@@ -132,7 +132,7 @@ class E2VUNiiQAPlusColor(LineCamera):
         return_code = self._frame_grabber.serial_read()
 
     @property
-    def _scan_direction(self) -> Literal['forward', 'reverse']:
+    def scan_direction(self) -> Literal['forward', 'reverse']:
         """Returns scan direction, forward or reverse."""
         self._frame_grabber.serial_write("r scdi\r")
         direction = int(self._frame_grabber.serial_read())
@@ -143,8 +143,8 @@ class E2VUNiiQAPlusColor(LineCamera):
         else:
             raise RuntimeError("Unsupported scan direction mode: external control")
 
-    @_scan_direction.setter
-    def _scan_direction(self, direction: Literal['forward', 'reverse']):
+    @scan_direction.setter
+    def scan_direction(self, direction: Literal['forward', 'reverse']):
         if direction == 'forward':
             scdi = 0
         elif direction == 'reverse':
