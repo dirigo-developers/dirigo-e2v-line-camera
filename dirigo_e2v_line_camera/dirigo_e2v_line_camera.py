@@ -22,6 +22,13 @@ class E2VUNiiQAPlusColor(LineCamera):
 
         self.white_balance_enabled = True
 
+    @property # cache this?
+    def sensor_shape(self) -> tuple[int, int]:
+        cmd = "r snsw\r"
+        self._frame_grabber.serial_write(cmd)
+        sensor_width = int(self._frame_grabber.serial_read())
+        return (1, sensor_width)
+
     @property
     def integration_time(self) -> units.Time:
         """ Get integration time. """
