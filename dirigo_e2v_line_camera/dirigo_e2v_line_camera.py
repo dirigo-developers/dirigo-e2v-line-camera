@@ -21,6 +21,7 @@ class E2VUNiiQAPlusColor(LineCamera):
         self._frame_grabber: FrameGrabber
 
         self.white_balance_enabled = True
+        self._column_interpolation = False
 
     @property # cache this?
     def sensor_shape(self) -> tuple[int, int]:
@@ -136,6 +137,22 @@ class E2VUNiiQAPlusColor(LineCamera):
         elif new_mode == '2048 pixels, 10x10 µm':
             sensor_mode = 1
         self._frame_grabber.serial_write(f"w smod {sensor_mode}\r")
+        return_code = self._frame_grabber.serial_read()
+
+    @property
+    def _column_interpolation(self) -> bool:
+        """
+        Column interpolation status.
+        
+        Column interpolation is used to correct red/blue color error across line.
+        """
+        self._frame_grabber.serial_write(f"r ccit\r")
+        enabled = int(self._frame_grabber.serial_read())
+        return enabled == True
+    
+    @_column_interpolation.setter
+    def _column_interpolation(self, enabled: bool):
+        self._frame_grabber.serial_write(f"w ccit {enabled}\r")
         return_code = self._frame_grabber.serial_read()
 
     @property
