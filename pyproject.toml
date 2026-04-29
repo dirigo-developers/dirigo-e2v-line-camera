@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dirigo_e2v_line_camera"
-version = "0.1.3"
+version = "0.1.4"
 description = "Plugin to use E2V and Atmel line-scan cameras with Dirigo."
 authors = [
     {name = "T. D. Weber", email = "tweber@mit.edu"}
