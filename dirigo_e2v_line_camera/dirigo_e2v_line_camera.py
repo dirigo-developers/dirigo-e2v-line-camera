@@ -66,6 +66,40 @@ class E2VUNiiQAPlusColor(LineCamera):
         return_code = self._frame_grabber.serial_read()
 
     @property
+    def _digital_gain(self) -> float:
+        self._frame_grabber.serial_write("r gain\r")
+        gain_code = self._frame_grabber.serial_read()
+        # gain code should be a value from 0 to 6193
+        return 1 + int(gain_code) / 4096
+    
+    @_digital_gain.setter
+    def _digital_gain(self, new_gain: float):
+        gain_code = round(4096 * (new_gain - 1))
+        if gain_code < 0:
+            raise ValueError(f"Digital gain must be ≥ 1, got {new_gain}")
+        elif gain_code > 6193:
+            raise ValueError(f"Digital gain must be < 2.512, got {new_gain}")
+        self._frame_grabber.serial_write(f"w gain {gain_code}\r")
+        return_code = self._frame_grabber.serial_read()
+
+    @property
+    def _digital_offset(self) -> int:
+        self._frame_grabber.serial_write("r offs\r")
+        offset = self._frame_grabber.serial_read()
+        # should be a value from -4096 to 4095
+        return int(offset)
+    
+    @_digital_offset.setter
+    def _digital_offset(self, new_offset: int):
+        offset = int(new_offset)
+        if offset < -4096:
+            raise ValueError(f"Digital offset must be ≥ -4096, got {offset}")
+        elif offset > 4096:
+            raise ValueError(f"Digital offset must be < 4096, got {offset}")
+        self._frame_grabber.serial_write(f"w offs {offset}\r")
+        return_code = self._frame_grabber.serial_read()
+            
+    @property
     def bit_depth(self) -> int:
         return 24 # RGB24
     
@@ -115,8 +149,10 @@ class E2VUNiiQAPlusColor(LineCamera):
         profile = io.load_toml(
             io.config_path() / "line_camera/default_profile.toml"
         )
-        self.gain           = profile['gain']
-        self._sensor_mode   = profile['sensor_mode']
+        self.gain            = profile['gain']
+        self._digital_gain   = profile['digital_gain']
+        self._digital_offset = profile['digital_offset']
+        self._sensor_mode    = profile['sensor_mode']
 
     @property
     def _sensor_mode(self) -> Literal['4096 pixels, 5x5 µm', '2048 pixels, 10x10 µm']:
@@ -152,7 +188,7 @@ class E2VUNiiQAPlusColor(LineCamera):
     
     @_column_interpolation.setter
     def _column_interpolation(self, enabled: bool):
-        self._frame_grabber.serial_write(f"w ccit {enabled}\r")
+        self._frame_grabber.serial_write(f"w ccit {1 if enabled else 0}\r")
         return_code = self._frame_grabber.serial_read()
 
     @property
