@@ -232,10 +232,6 @@ class E2VUNiiQAPlusColor(LineCamera):
         self._frame_grabber.serial_write("w awbc 1\r")
         return_code = self._frame_grabber.serial_read()
 
-    def stop_auto_white_balance(self) -> None:
-        self._frame_grabber.serial_write("w awbc 0\r")
-        return_code = self._frame_grabber.serial_read()
-
     @property
     def white_balance_gains(self):
         def write_read(command):
@@ -244,6 +240,16 @@ class E2VUNiiQAPlusColor(LineCamera):
         
         colors = ('r', 'b', 'g', 'j')
         return {c : write_read(f"r gwb{c}\r") for c in colors}
+    
+    def start_fpn_correction(self) -> None:
+        """Begins built-in auto fixed pattern noise correction calibration."""
+        self._frame_grabber.serial_write("w calo 1\r")
+        return_code = self._frame_grabber.serial_read()
+    
+    def start_prnu_correction(self) -> None:
+        """Begins built-in auto photoresponse nonuniformity correction calibration."""
+        self._frame_grabber.serial_write("w calg 1\r")
+        return_code = self._frame_grabber.serial_read()
 
 
 
